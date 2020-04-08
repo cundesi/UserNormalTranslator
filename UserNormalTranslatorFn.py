@@ -4,6 +4,7 @@
 import os
 import sys
 import pymel.core as pm
+import maya.api.OpenMaya as om
 
 import inspect
 if not hasattr(sys.modules[__name__], '__file__'):
@@ -51,20 +52,47 @@ class userNormalTranslatorWindow(Ui_userNormalTranslatorWindow):
         self.pBtnCreateCenter.clicked.connect(self.crerateCenterFn)
 
     def addNormal(self, xValue=0, yValue=0, zValue=0):
-        for v in pm.filterExpand(ex=True, sm=31):
-            temp_normal = pm.polyNormalPerVertex(v, q=True, xyz=True)[:3]
-            pm.polyNormalPerVertex(
-                v,
-                xyz=((temp_normal[0] + xValue), (temp_normal[1] + yValue), (temp_normal[2] + zValue))
-            )
+
+        sel_list = om.MGlobal.getActiveSelectionList()
+        for sel_index in range(sel_list.length()):
+            (path, comp) = sel_list.getComponent(sel_index)
+            mesh_fn = om.MFnMesh(path)
+
+            if comp.apiType() in [om.MFn.kMeshVertComponent]:
+                comp_fn = om.MFnSingleIndexedComponent(comp)
+                comp_fn.getElements()
+                indices = comp_fn.getElements()
+                vtx_normals = []
+                for vtx_index in indices:
+                    vtx_normal = mesh_fn.getVertexNormal(vtx_index, True)
+                    vtx_normals.append(
+                        om.MVector(
+                            vtx_normal.x + xValue, vtx_normal.y + yValue, vtx_normal.z + zValue
+                        )
+                    )
+                mesh_fn.setVertexNormals(vtx_normals, indices)
+
 
     def mulNormal(self, xValue=1, yValue=1, zValue=1):
-        for v in pm.filterExpand(ex=True, sm=31):
-            temp_normal = pm.polyNormalPerVertex(v, q=True, xyz=True)[:3]
-            pm.polyNormalPerVertex(
-                v,
-                xyz=((temp_normal[0] * xValue), (temp_normal[1] * yValue), (temp_normal[2] * zValue))
-            )
+
+        sel_list = om.MGlobal.getActiveSelectionList()
+        for sel_index in range(sel_list.length()):
+            (path, comp) = sel_list.getComponent(sel_index)
+            mesh_fn = om.MFnMesh(path)
+
+            if comp.apiType() in [om.MFn.kMeshVertComponent]:
+                comp_fn = om.MFnSingleIndexedComponent(comp)
+                comp_fn.getElements()
+                indices = comp_fn.getElements()
+                vtx_normals = []
+                for vtx_index in indices:
+                    vtx_normal = mesh_fn.getVertexNormal(vtx_index, True)
+                    vtx_normals.append(
+                        om.MVector(
+                            vtx_normal.x * xValue, vtx_normal.y * yValue, vtx_normal.z * zValue
+                        )
+                    )
+                mesh_fn.setVertexNormals(vtx_normals, indices)
 
     def setXNormal(self):
         XValue = self.dbsBoxX.value()
@@ -168,13 +196,11 @@ class userNormalTranslatorWindow(Ui_userNormalTranslatorWindow):
     def spherizerNormal(self):
         ratio = self.dbsBoxRatio.value()
         vetList = pm.filterExpand(ex=True, sm=31)
-        print self.center
         if self.center:
             obj = self.center
         else:
             obj = pm.PyNode(vetList[0].split('.')[0])
         pos = pm.dt.Point((obj.getBoundingBoxMax() + obj.getBoundingBoxMin()) / 2)
-        print pos
         for v in vetList:
             vPos = pm.PyNode(v).getPosition(space='world')
             temp_normal = pm.polyNormalPerVertex(v, q=True, xyz=True)[:3]
