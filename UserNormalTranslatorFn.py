@@ -25,7 +25,7 @@ class userNormalTranslatorWindow(Ui_userNormalTranslatorWindow):
         super(userNormalTranslatorWindow, self).__init__(parent)
         self.setupUi(self)
         self.center = None
-        self.pBtnX.clicked.connect(self.setXNormal)
+        self.pBtnX.clicked.connect(self.set_normals)
         self.pBtnXValue1.clicked.connect(self.setXNormalValue1)
         self.pBtnXValue2.clicked.connect(self.setXNormalValue2)
         self.pBtnXValue3.clicked.connect(self.setXNormalValue3)
@@ -51,8 +51,7 @@ class userNormalTranslatorWindow(Ui_userNormalTranslatorWindow):
         self.pBtnSpherizeApply.clicked.connect(self.spherizerNormal)
         self.pBtnCreateCenter.clicked.connect(self.crerateCenterFn)
 
-    def addNormal(self, xValue=0, yValue=0, zValue=0):
-
+    def update_normals(self, x_value, y_value, z_value, modle='add'):
         sel_list = om.MGlobal.getActiveSelectionList()
         for sel_index in range(sel_list.length()):
             (path, comp) = sel_list.getComponent(sel_index)
@@ -60,73 +59,60 @@ class userNormalTranslatorWindow(Ui_userNormalTranslatorWindow):
 
             if comp.apiType() in [om.MFn.kMeshVertComponent]:
                 comp_fn = om.MFnSingleIndexedComponent(comp)
-                comp_fn.getElements()
                 indices = comp_fn.getElements()
                 vtx_normals = []
                 for vtx_index in indices:
                     vtx_normal = mesh_fn.getVertexNormal(vtx_index, True)
-                    vtx_normals.append(
-                        om.MVector(
-                            vtx_normal.x + xValue, vtx_normal.y + yValue, vtx_normal.z + zValue
+                    if modle == 'add':
+                        new_vtx_normal = om.MVector(
+                            vtx_normal.x + x_value, vtx_normal.y + y_value, vtx_normal.z + z_value
                         )
-                    )
+                    else:
+                        new_vtx_normal = om.MVector(
+                            vtx_normal.x * x_value, vtx_normal.y * y_value, vtx_normal.z * z_value
+                        )
+                    vtx_normals.append(new_vtx_normal)
                 mesh_fn.setVertexNormals(vtx_normals, indices)
 
+    def add_normals(self, x_value=0, y_value=0, z_value=0):
+        self.update_normals(x_value, y_value, z_value)
 
-    def mulNormal(self, xValue=1, yValue=1, zValue=1):
+    def mulltiply_normals(self, x_value=1, y_value=1, z_value=1):
+        self.update_normals(x_value, y_value, z_value, modle='mulltiply')
 
-        sel_list = om.MGlobal.getActiveSelectionList()
-        for sel_index in range(sel_list.length()):
-            (path, comp) = sel_list.getComponent(sel_index)
-            mesh_fn = om.MFnMesh(path)
-
-            if comp.apiType() in [om.MFn.kMeshVertComponent]:
-                comp_fn = om.MFnSingleIndexedComponent(comp)
-                comp_fn.getElements()
-                indices = comp_fn.getElements()
-                vtx_normals = []
-                for vtx_index in indices:
-                    vtx_normal = mesh_fn.getVertexNormal(vtx_index, True)
-                    vtx_normals.append(
-                        om.MVector(
-                            vtx_normal.x * xValue, vtx_normal.y * yValue, vtx_normal.z * zValue
-                        )
-                    )
-                mesh_fn.setVertexNormals(vtx_normals, indices)
-
-    def setXNormal(self):
-        XValue = self.dbsBoxX.value()
+    def set_normals(self):
+        x_value = self.dbsBoxX.value()
         if self.rdBtnAdd.isChecked():
-            self.addNormal(xValue=XValue)
+            self.add_normals(x_value=x_value)
         else:
-            self.mulNormal(xValue=XValue)
+            self.mulltiply_normals(x_value=x_value)
 
     def setXNormalValue1(self):
         self.resetNormalValue()
         self.dbsBoxX.setValue(-0.1)
-        self.setXNormal()
+        self.set_normals()
 
     def setXNormalValue2(self):
         self.resetNormalValue()
         self.dbsBoxX.setValue(-0.5)
-        self.setXNormal()
+        self.set_normals()
 
     def setXNormalValue3(self):
         self.resetNormalValue()
         self.dbsBoxX.setValue(0.5)
-        self.setXNormal()
+        self.set_normals()
 
     def setXNormalValue4(self):
         self.resetNormalValue()
         self.dbsBoxX.setValue(0.1)
-        self.setXNormal()
+        self.set_normals()
 
     def setYNormal(self):
         YValue = self.dbsBoxY.value()
         if self.rdBtnAdd.isChecked():
-            self.addNormal(yValue=YValue)
+            self.add_normals(y_value=YValue)
         else:
-            self.mulNormal(yValue=YValue)
+            self.mulltiply_normals(y_value=YValue)
 
     def setYNormalValue1(self):
         self.resetNormalValue()
@@ -151,9 +137,9 @@ class userNormalTranslatorWindow(Ui_userNormalTranslatorWindow):
     def setZNormal(self):
         ZValue = self.dbsBoxZ.value()
         if self.rdBtnAdd.isChecked():
-            self.addNormal(zValue=ZValue)
+            self.add_normals(z_value=ZValue)
         else:
-            self.mulNormal(zValue=ZValue)
+            self.mulltiply_normals(z_value=ZValue)
 
     def setZNormalValue1(self):
         self.resetNormalValue()
@@ -195,17 +181,30 @@ class userNormalTranslatorWindow(Ui_userNormalTranslatorWindow):
 
     def spherizerNormal(self):
         ratio = self.dbsBoxRatio.value()
-        vetList = pm.filterExpand(ex=True, sm=31)
-        if self.center:
-            obj = self.center
-        else:
-            obj = pm.PyNode(vetList[0].split('.')[0])
-        pos = pm.dt.Point((obj.getBoundingBoxMax() + obj.getBoundingBoxMin()) / 2)
-        for v in vetList:
-            vPos = pm.PyNode(v).getPosition(space='world')
-            temp_normal = pm.polyNormalPerVertex(v, q=True, xyz=True)[:3]
-            new_normal = (vPos - pos) * ratio + pm.dt.Point(temp_normal) * (1 - ratio)
-            pm.polyNormalPerVertex(v, xyz=new_normal)
+
+        sel_list = om.MGlobal.getActiveSelectionList()
+        for sel_index in range(sel_list.length()):
+            (path, comp) = sel_list.getComponent(sel_index)
+            mesh_fn = om.MFnMesh(path)
+            if self.center:
+                bounding_box = self.center.boundingBox()
+                pos = om.MVector(bounding_box.center())
+
+            else:
+                dag_node = om.MFnDagNode(path.transform())
+                pos = dag_node.boundingBox.center
+            if comp.apiType() in [om.MFn.kMeshVertComponent]:
+                comp_fn = om.MFnSingleIndexedComponent(comp)
+                indices = comp_fn.getElements()
+                vtx_normals = []
+                for vtx_index in indices:
+                    vtx_normal = mesh_fn.getVertexNormal(vtx_index, True)
+                    vtx_point = mesh_fn.getPoint(vtx_index, space=om.MSpace.kWorld)
+                    new_vtx_normal = om.MVector(
+                        (vtx_point - pos) * ratio + vtx_normal * (1 - ratio)
+                    )
+                    vtx_normals.append(new_vtx_normal)
+                mesh_fn.setVertexNormals(vtx_normals, indices)
 
     def setShperizeValue1(self):
         self.dbsBoxRatio.setValue(0.1)
